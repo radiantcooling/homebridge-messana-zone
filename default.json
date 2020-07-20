@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "apikey": "9bf711fc-54e2-4387-9c7f-991bbb02ab3a",
+  "refreshZone": 2,
+  "refreshSystem": 5,
+  "refreshFancoil": 5,
+  "refreshMacrozone": 5,
+  "refreshHC": 5,
+  "temperatureUnit": 1,
+  "zone": {
+    "apis": {
+      "getCurrentTemperature": "zone/temperature/",
+      "getTargetTemperature": "zone/setpoint/",
+      "setTargetTemperature": "zone/setpoint",
+      "getHumidity": "zone/humidity/",
+      "getTargetHumidity": "zone/currentSetpointRH/",
+      "setTargetHumidity": "zone/currentSetpointRH",
+      "setState": "zone/status",
+      "getState": "zone/status/",
+      "getAirQuality": "zone/airQuality/",
+      "getMacrozone": "zone/macrozoneId/",
+      "getVOC": "zone/voc/"
+    }
+  },
+  "macrozone": {
+    "apis": {
+      "getCurrentTemperature": "macrozone/temperature/",
+      "getTargetTemperature": "macrozone/setpoint/",
+      "setTargetTemperature": "macrozone/setpoint",
+      "getHumidity": "macrozone/humidity/",
+      "setState": "macrozone/status",
+      "getState": "macrozone/status/"
+    }
+  },
+  "fancoil": {
+    "apis": {
+      "getHeatingSpeed": "fcu/heatingSpeed/",
+      "setHeatingSpeed": "fcu/heatingSpeed",
+      "getCoolingSpeed": "fcu/coolingSpeed/",
+      "setCoolingSpeed": "fcu/coolingSpeed",
+      "getState": "fcu/status/",
+      "setState": "fcu/status"
+    }
+  },
+  "system": {
+    "apis": {
+      "getEnergySaving": "system/energySaving",
+      "setEnergySaving": "system/energySaving",
+      "getSetback": "system/setback",
+      "setSetback": "system/setback",
+      "getAirOn": "atu/status/",
+      "setAirOn": "atu/status",
+      "getDhwOn": "dhw/status/",
+      "setDhwOn": "dhw/status",
+      "getSystemOn": "system/status/",
+      "setSystemOn": "system/status"
+    }
+  },
+  "hc": {
+    "apis": {
+      "getMode": "hc/mode/",
+      "setMode": "hc/mode",
+      "getAC": "hc/adaptiveComfort/",
+      "setAC": "hc/adaptiveComfort"
+    }
+  }
+}
