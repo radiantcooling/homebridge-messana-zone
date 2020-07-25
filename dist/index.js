@@ -63,7 +63,8 @@ ThermostatZone.prototype = {
   },
 
   getTargetHeatingCoolingState: function(callback) {
-    this.log("[+] getTargerHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey);
+
+    // this.log("[+] getTargerHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey);
 
     //Status state
     var url = this.apiroute + defaultJSON.system.apis.getSystemOn + "?apikey=" + this.apikey;
@@ -73,7 +74,12 @@ ThermostatZone.prototype = {
         callback(error);
       } else {
 
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.on = (json.status == 0)? false : true
         if(!this.on) {
           this.targetHeatingCoolingState = 0
@@ -88,7 +94,12 @@ ThermostatZone.prototype = {
               this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
               callback(error);
             } else {
-              var json = JSON.parse(responseBody);
+              try{
+                var json = JSON.parse(responseBody);
+              }
+              catch(err){
+                callback(-1);return
+              }
               var macrozoneid = json.macrozoneId
               var url = this.apiroute + defaultJSON.macrozone.apis.getState + macrozoneid + "?apikey=" + this.apikey;
               util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
@@ -96,7 +107,12 @@ ThermostatZone.prototype = {
                   this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
                   callback(error);
                 } else {
-                  var json = JSON.parse(responseBody);
+                  try{
+                    var json = JSON.parse(responseBody);
+                  }
+                  catch(err){
+                    callback(-1);return
+                  }
                   // if(this.logZone) this.log('macrozone status', json)
                   if(!json.status){
                     this.targetHeatingCoolingState = 0;
@@ -109,7 +125,12 @@ ThermostatZone.prototype = {
                         this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
                         callback(error);
                       } else {
-                        var json = JSON.parse(responseBody);
+                        try{
+                          var json = JSON.parse(responseBody);
+                        }
+                        catch(err){
+                          callback(-1);return
+                        }
                         // if(this.logZone) this.log('zone status', json)
                         if(json.status > 0 ) json.status = 3
                         this.targetHeatingCoolingState = json.status;
@@ -158,7 +179,12 @@ ThermostatZone.prototype = {
         this.log("[!] Error getting currentTemperature: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
           // this.log("Current Temperature: %s", json);
         if(json.value)  {
           if(json.value == -3276.8){
@@ -188,7 +214,12 @@ ThermostatZone.prototype = {
         this.log("[!] Error getting currentTemperature: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.targetTemperature = util.convertF2C(json.value, this.temperatureDisplayUnits);
         if(this.logZone)
           this.log("Read value %s from Messana and converted to %s ", json.value, this.targetTemperature)
@@ -225,7 +256,12 @@ ThermostatZone.prototype = {
         this.log("[!] Error getting currentRelativeHumidity: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.currentRelativeHumidity = Math.round(parseFloat(json.value)-0.01);
         // this.log("[*] currentRelativeHumidity: %s", this.currentRelativeHumidity);
         callback(null, this.currentRelativeHumidity);
@@ -242,7 +278,12 @@ ThermostatZone.prototype = {
         this.log("[!] Error getting targetRelativeHumidity: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.targetRelativeHumidity = Math.round(parseFloat(json.value)-0.01);
         // this.log("[*] targetRelativeHumidity: %s", this.targetRelativeHumidity);
         callback(null, this.targetRelativeHumidity);
@@ -408,7 +449,13 @@ OptTemp.prototype = {
         // this.log("[!] Error getting currentTemperature: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);
+          return
+        }
         if(!json.value || json.value == 0){
           this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
           callback(-1, null);
@@ -503,7 +550,12 @@ AirQuality.prototype = {
         return
       } else {
         // let characteristic = this.serviceA.getCharacteristic( Characteristic.AirQuality );
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         if(!json.category){
           callback(-1, -1);
         }
@@ -530,7 +582,12 @@ AirQuality.prototype = {
         return
       } else {
         let characteristic = this.serviceA.getCharacteristic( Characteristic.AirQuality );
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.currentAirQualityValue = json.value;
         // this.log("[*] getAirQualityCategory: %s", this.currentAirQualityValue);
         callback(null, this.currentAirQualityValue);
@@ -546,7 +603,12 @@ AirQuality.prototype = {
         // this.log("[!] Error getting getAirQualityValue: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         this.currentVOCValue = parseFloat(json.value);
         // this.log("[*] getVOCValue: %s", this.currentVOCValue);
         callback(null, this.currentVOCValue);
@@ -641,7 +703,12 @@ RelHumidity.prototype = {
         // this.log("[!] Error getting currentRelativeHumidity: %s", error.message);
         callback(error);
       } else {
-        var json = JSON.parse(responseBody);
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
         if(!json.value || json.value == 0){
           this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
           callback(-1, null);
