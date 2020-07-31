@@ -13,21 +13,11 @@ module.exports = function(homebridge) {
   Characteristic = homebridge.hap.Characteristic;
   Categories = homebridge.hap.Categories;
 
-  // console.log(Categories)
-
-  homebridge.registerPlatform("MessanaPlatform", MessanaPlatform);
-  // homebridge.registerPlatformAccessories('ThermostatZone', 'MessanaSystem', [ThermostatZone]);
   homebridge.registerAccessory("messana-zone", "ThermostatZone", ThermostatZone);
   homebridge.registerAccessory("messana-zone", "OptTemp", OptTemp);
   homebridge.registerAccessory("messana-zone", "AirQuality", AirQuality);
   homebridge.registerAccessory("messana-zone", "RelHumidity", RelHumidity);
-
-  this.aaa = "aaa2"
-
 };
-
-function MessanaPlatform(log, config, api) {}
-MessanaPlatform.prototype = {}
 
 function ThermostatZone(log, config, api) {
   this.apikey = util.getApiKey(api)
