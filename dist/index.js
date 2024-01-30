@@ -638,7 +638,7 @@ AirQuality.prototype = {
     this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity)
       .setProps({
         minValue: 0,
-        maxValue: 2100
+        maxValue: 4000
       });
 
     // this.serviceA.getCharacteristic(Characteristic.VOCdensity)
