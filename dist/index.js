@@ -252,9 +252,14 @@ ThermostatZone.prototype = {
         catch(err){
           callback(-1);return
         }
+	if(!json.value || json.value < 0){
+          this.currentRelativeHumidity = 0;
+          callback(null, this.currentRelativeHumidity);
+        } else {
         this.currentRelativeHumidity = Math.round(parseFloat(json.value)-0.01);
         // this.log("[*] currentRelativeHumidity: %s", this.currentRelativeHumidity);
         callback(null, this.currentRelativeHumidity);
+        }
       }
     }.bind(this));
   },
@@ -435,6 +440,114 @@ OptTemp.prototype = {
     // this.log("Identify requested!");
     callback();
   },
+  getTargetHeatingCoolingState: function(callback) {
+
+    // this.log("[+] getTargerHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey);
+
+    //Status state
+    var url = this.apiroute + defaultJSON.system.apis.getSystemOn + "?apikey=" + this.apikey;
+    util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+      if (error) {
+        this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+        callback(error);
+      } else {
+
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
+        this.on = (json.status == 0)? false : true
+        if(!this.on) {
+          this.targetHeatingCoolingState = 0
+          callback(null, this.targetHeatingCoolingState);
+        }
+        else {
+          // if(this.logZone) this.log('system ON')
+          //Macrozone state
+          var url = this.apiroute + defaultJSON.zone.apis.getMacrozone + this.id + "?apikey=" + this.apikey;
+          util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+            if (error) {
+              this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+              callback(error);
+            } else {
+              try{
+                var json = JSON.parse(responseBody);
+              }
+              catch(err){
+                callback(-1);return
+              }
+              var macrozoneid = json.macrozoneId
+              var url = this.apiroute + defaultJSON.macrozone.apis.getState + macrozoneid + "?apikey=" + this.apikey;
+              util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+                if (error) {
+                  this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+                  callback(error);
+                } else {
+                  try{
+                    var json = JSON.parse(responseBody);
+                  }
+                  catch(err){
+                    callback(-1);return
+                  }
+                  // if(this.logZone) this.log('macrozone status', json)
+                  if(!json.status){
+                    this.targetHeatingCoolingState = 0;
+                    callback(null, this.targetHeatingCoolingState);
+                  }
+                  else {
+                    var url = this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey;
+                    util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+                      if (error) {
+                        this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+                        callback(error);
+                      } else {
+                        try{
+                          var json = JSON.parse(responseBody);
+                        }
+                        catch(err){
+                          callback(-1);return
+                        }
+                        // if(this.logZone) this.log('zone status', json)
+                        if(json.status > 0 ) json.status = 3
+                        this.targetHeatingCoolingState = json.status;
+                        callback(null, this.targetHeatingCoolingState);
+                      }
+                    }.bind(this));
+                  }
+                }
+              }.bind(this));
+            }
+          }.bind(this));
+        }
+      }
+    }.bind(this));
+  },
+
+  setTargetHeatingCoolingState: function(value, callback) {
+    if(!this.on){
+      this.log("System OFF - Unable to change zone's state")
+      callback();
+      return
+    }
+    // this.log("[+] setTargetHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.setState + "?apikey=" + this.apikey);
+    var url = this.apiroute + defaultJSON.zone.apis.setState + "?apikey=" + this.apikey;
+    if(value == 3) value = 1
+    var body = {
+      id: this.id,
+      value: value
+    }
+    util.httpRequest(url, body, 'PUT', function(error, response, responseBody) {
+      if (error) {
+        this.log("[!] Error setting targetHeatingCoolingState", error.message);
+        callback(error);
+      } else {
+        this.log("[*] Sucessfully set targetHeatingCoolingState to %s", value);
+        callback();
+      }
+    }.bind(this));
+  },
 
   getCurrentTemperature: function(callback) {
     // this.log("[+] getCurrentTemperature from:", this.apiroute + defaultJSON.zone.apis.getCurrentTemperature + this.id + "?apikey=" + this.apikey);
@@ -452,7 +565,7 @@ OptTemp.prototype = {
           return
         }
         if(!json.value || json.value == 0){
-          this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
+           this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
           callback(-1, null);
         }
         else {
@@ -486,7 +599,12 @@ OptTemp.prototype = {
       .setCharacteristic(Characteristic.Manufacturer, util.staticValues.manufacturer)
       .setCharacteristic(Characteristic.SerialNumber, defaultJSON.version);
 
-    this.service
+	 this.service
+      .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      .on('get', this.getTargetHeatingCoolingState.bind(this))
+      .on('set', this.setTargetHeatingCoolingState.bind(this));
+
+	this.service
       .getCharacteristic(Characteristic.CurrentTemperature)
       .on('get', this.getCurrentTemperature.bind(this));
 
@@ -537,7 +655,7 @@ AirQuality.prototype = {
   },
 
   getAirQualityCategory: function(callback) {
-    // this.log("[+] getAirQualityCategory from:", this.apiroute + defaultJSON.zone.apis.getAirQuality + this.id + "?apikey=" + this.apikey);
+   //  this.log("[+] getAirQualityCategory from:", this.apiroute + defaultJSON.zone.apis.getAirQuality + this.id + "?apikey=" + this.apikey);
     var url = this.apiroute + defaultJSON.zone.apis.getAirQuality + this.id + "?apikey=" + this.apikey;
     util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
       if (error) {
@@ -547,12 +665,12 @@ AirQuality.prototype = {
         // let characteristic = this.serviceA.getCharacteristic( Characteristic.AirQuality );
         try{
           var json = JSON.parse(responseBody);
-        }
+      }
         catch(err){
-          callback(-1);return
+        callback(-1);return
         }
         if(!json.category){
-          callback(-1, -1);
+		callback(null,0);
         }
         else {
           if(json.category == 'Excellent') json.category = 1
@@ -581,11 +699,16 @@ AirQuality.prototype = {
           var json = JSON.parse(responseBody);
         }
         catch(err){
-          callback(-1);return
+	      callback(0,this.currentAirQualityValue);return
         }
+  	 if(!json.value){
+	this.currentAirQualityValue = 0; 
+        	callback(null, this.currentAirQualityValue);
+        } else {
         this.currentAirQualityValue = json.value;
         // this.log("[*] getAirQualityCategory: %s", this.currentAirQualityValue);
         callback(null, this.currentAirQualityValue);
+	}
       }
     }.bind(this));
   },
@@ -604,9 +727,15 @@ AirQuality.prototype = {
         catch(err){
           callback(-1);return
         }
-        this.currentVOCValue = parseFloat(json.value);
-        // this.log("[*] getVOCValue: %s", this.currentVOCValue);
-        callback(null, this.currentVOCValue);
+	 if(!json.value || json.value < 0){
+            this.currentVOCValue = 0;
+            callback(null,this.currentVOCValue);
+        } else {
+           this.currentVOCValue = parseFloat(json.value);
+           // this.log("[*] getVOCValue: %s", this.currentVOCValue);
+           callback(null, this.currentVOCValue);
+        }  
+
       }
     }.bind(this));
   },
@@ -690,6 +819,114 @@ RelHumidity.prototype = {
     callback();
   },
 
+  getTargetHeatingCoolingState: function(callback) {
+
+    // this.log("[+] getTargerHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey);
+
+    //Status state
+    var url = this.apiroute + defaultJSON.system.apis.getSystemOn + "?apikey=" + this.apikey;
+    util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+      if (error) {
+        this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+        callback(error);
+      } else {
+
+        try{
+          var json = JSON.parse(responseBody);
+        }
+        catch(err){
+          callback(-1);return
+        }
+        this.on = (json.status == 0)? false : true
+        if(!this.on) {
+          this.targetHeatingCoolingState = 0
+          callback(null, this.targetHeatingCoolingState);
+        }
+        else {
+          // if(this.logZone) this.log('system ON')
+          //Macrozone state
+          var url = this.apiroute + defaultJSON.zone.apis.getMacrozone + this.id + "?apikey=" + this.apikey;
+          util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+            if (error) {
+              this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+              callback(error);
+            } else {
+              try{
+                var json = JSON.parse(responseBody);
+              }
+              catch(err){
+                callback(-1);return
+              }
+              var macrozoneid = json.macrozoneId
+              var url = this.apiroute + defaultJSON.macrozone.apis.getState + macrozoneid + "?apikey=" + this.apikey;
+              util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+                if (error) {
+                  this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+                  callback(error);
+                } else {
+                  try{
+                    var json = JSON.parse(responseBody);
+                  }
+                  catch(err){
+                    callback(-1);return
+                  }
+                  // if(this.logZone) this.log('macrozone status', json)
+                  if(!json.status){
+                    this.targetHeatingCoolingState = 0;
+                    callback(null, this.targetHeatingCoolingState);
+                  }
+                  else {
+                    var url = this.apiroute + defaultJSON.zone.apis.getState + this.id + "?apikey=" + this.apikey;
+                    util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
+                      if (error) {
+                        this.log("[!] Error getting targetHeatingCoolingState: %s", error.message);
+                        callback(error);
+                      } else {
+                        try{
+                          var json = JSON.parse(responseBody);
+                        }
+                        catch(err){
+                          callback(-1);return
+                        }
+                        // if(this.logZone) this.log('zone status', json)
+                        if(json.status > 0 ) json.status = 3
+                        this.targetHeatingCoolingState = json.status;
+                        callback(null, this.targetHeatingCoolingState);
+                      }
+                    }.bind(this));
+                  }
+                }
+              }.bind(this));
+            }
+          }.bind(this));
+        }
+      }
+    }.bind(this));
+  },
+
+  setTargetHeatingCoolingState: function(value, callback) {
+    if(!this.on){
+      this.log("System OFF - Unable to change zone's state")
+      callback();
+      return
+    }
+    // this.log("[+] setTargetHeatingCoolingState from:", this.apiroute + defaultJSON.zone.apis.setState + "?apikey=" + this.apikey);
+    var url = this.apiroute + defaultJSON.zone.apis.setState + "?apikey=" + this.apikey;
+    if(value == 3) value = 1
+    var body = {
+      id: this.id,
+      value: value
+    }
+    util.httpRequest(url, body, 'PUT', function(error, response, responseBody) {
+      if (error) {
+        this.log("[!] Error setting targetHeatingCoolingState", error.message);
+        callback(error);
+      } else {
+        this.log("[*] Sucessfully set targetHeatingCoolingState to %s", value);
+        callback();
+      }
+    }.bind(this));
+  },
   getCurrentRelativeHumidity: function(callback) {
     // this.log("[+] getCurrentRelativeHumidity from:", this.apiroute + defaultJSON.zone.apis.getHumidity + this.id + "?apikey=" + this.apikey);
     var url = this.apiroute + defaultJSON.zone.apis.getHumidity + this.id + "?apikey=" + this.apikey;
@@ -704,7 +941,7 @@ RelHumidity.prototype = {
         catch(err){
           callback(-1);return
         }
-        if(!json.value || json.value == 0){
+        if(!json.value || json.value == 0 || json.value < 0){
           this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
           callback(-1, null);
         }
@@ -728,6 +965,11 @@ RelHumidity.prototype = {
       .setCharacteristic(Characteristic.Model, this.model)
       .setCharacteristic(Characteristic.Manufacturer, util.staticValues.manufacturer)
       .setCharacteristic(Characteristic.SerialNumber, defaultJSON.version);
+
+    this.service
+      .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      .on('get', this.getTargetHeatingCoolingState.bind(this))
+      .on('set', this.setTargetHeatingCoolingState.bind(this));
 
     this.service
       .getCharacteristic(Characteristic.Name)
