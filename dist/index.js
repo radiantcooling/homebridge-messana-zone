@@ -274,9 +274,14 @@ ThermostatZone.prototype = {
         catch(err){
           callback(-1);return
         }
+        if(!json.value || json.value == 0){
+          this.service.getCharacteristic(Characteristic.TargetRelativeHumidity).updateValue(this.targetRelativeHumidity);
+          callback(null, this.targetRelativeHumidity);
+        } else {
         this.targetRelativeHumidity = Math.round(parseFloat(json.value)-0.01);
         // this.log("[*] targetRelativeHumidity: %s", this.targetRelativeHumidity);
         callback(null, this.targetRelativeHumidity);
+        }
       }
     }.bind(this));
   },
@@ -633,7 +638,7 @@ AirQuality.prototype = {
     this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity)
       .setProps({
         minValue: 0,
-        maxValue: 2100
+        maxValue: 4000
       });
 
     // this.serviceA.getCharacteristic(Characteristic.VOCdensity)
