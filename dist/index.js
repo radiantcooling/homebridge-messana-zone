@@ -13,10 +13,10 @@ module.exports = function(homebridge) {
   Characteristic = homebridge.hap.Characteristic;
   Categories = homebridge.hap.Categories;
 
-  homebridge.registerAccessory("messana-zone", "ThermostatZone", ThermostatZone);
-  homebridge.registerAccessory("messana-zone", "OptTemp", OptTemp);
-  homebridge.registerAccessory("messana-zone", "AirQuality", AirQuality);
-  homebridge.registerAccessory("messana-zone", "RelHumidity", RelHumidity);
+  homebridge.registerAccessory("homebridge-messana-zone", "ThermostatZone", ThermostatZone);
+  homebridge.registerAccessory("homebridge-messana-zone", "OptTemp", OptTemp);
+  homebridge.registerAccessory("homebridge-messana-zone", "AirQuality", AirQuality);
+  homebridge.registerAccessory("homebridge-messana-zone", "RelHumidity", RelHumidity);
 };
 
 function ThermostatZone(log, config, api) {
