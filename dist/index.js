@@ -1,4 +1,3 @@
-
 'use strict'
 
 let Service, Characteristic, HomebridgeAPI, Categories
@@ -564,7 +563,7 @@ OptTemp.prototype = {
           callback(-1);
           return
         }
-        if(!json.value || json.value == 0){
+        if(!json.value || json.value == 0 || json.value == -3276.8){
            this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(0);
           callback(-1, null);
         }
@@ -659,7 +658,7 @@ AirQuality.prototype = {
     var url = this.apiroute + defaultJSON.zone.apis.getAirQuality + this.id + "?apikey=" + this.apikey;
     util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
       if (error) {
-          callback(-1, -1);
+          callback(new Error('no response'));
         return
       } else {
         // let characteristic = this.serviceA.getCharacteristic( Characteristic.AirQuality );
@@ -667,7 +666,7 @@ AirQuality.prototype = {
           var json = JSON.parse(responseBody);
       }
         catch(err){
-        callback(-1);return
+        callback(new Error('no response'));return
         }
         if(!json.category){
 		callback(null,0);
@@ -691,7 +690,7 @@ AirQuality.prototype = {
     util.httpRequest(url, '', 'GET', function(error, response, responseBody) {
       if (error) {
         this.log("[!] Error getting getAirQualityCategory: %s", error.message);
-        callback(null, null);
+        callback(new Error('no response'));
         return
       } else {
         let characteristic = this.serviceA.getCharacteristic( Characteristic.AirQuality );
@@ -699,7 +698,7 @@ AirQuality.prototype = {
           var json = JSON.parse(responseBody);
         }
         catch(err){
-	      callback(0,this.currentAirQualityValue);return
+	      callback(new Error('no response'));return
         }
   	 if(!json.value){
 	this.currentAirQualityValue = 0; 
@@ -779,12 +778,12 @@ AirQuality.prototype = {
     setInterval(function() {
 
       this.getAirQualityCategory(function(err, temp) {
-        if (err) {temp = err;}
+        if (err) { this.serviceA.getCharacteristic(Characteristic.AirQuality).updateValue(new Error('no response')); return; }
         this.serviceA.getCharacteristic(Characteristic.AirQuality).updateValue(temp);
       }.bind(this));
 
       this.getAirQualityValue(function(err, temp) {
-        if (err) {temp = err;}
+        if (err) { this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(new Error('no response')); return; }
         this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(temp);
       }.bind(this));
 
