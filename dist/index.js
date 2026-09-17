@@ -643,6 +643,10 @@ function AirQuality(log, config, api) {
   this.apiroute = util.staticValues.apiroute
   this.currentAirQuality = config.currentAirQuality || 0;
   this.currentVOCValue = config.currentVOCValue || 0;
+  // Sensirion VOC Index probes (set by the backend generator): the reading is a
+  // 0-500 index, not a concentration, so VOCDensity/AirParticulateDensity are
+  // not exposed and only the AirQuality category is.
+  this.vocIndex = config.vocIndex === true;
   this.serviceA = new Service.AirQualitySensor(this.name);
 }
 
@@ -676,6 +680,7 @@ AirQuality.prototype = {
           else if(json.category == 'Good') json.category = 2
           else if(json.category == 'Fair') json.category = 3
           else if(json.category == 'High') json.category = 5
+          else json.category = 0 // UNKNOWN: e.g. "---" while the probe has no reading
 
           this.currentAirQualityCategory = json.category;
           callback(null, this.currentAirQualityCategory);
@@ -756,18 +761,20 @@ AirQuality.prototype = {
       .getCharacteristic(Characteristic.AirQuality)
       .on('get', this.getAirQualityCategory.bind(this));
 
-    this.serviceA
-      .getCharacteristic(Characteristic.AirParticulateDensity)
-      .on('get', this.getAirQualityValue.bind(this))
+    if (!this.vocIndex) {
+      this.serviceA
+        .getCharacteristic(Characteristic.AirParticulateDensity)
+        .on('get', this.getAirQualityValue.bind(this))
 
-    this.serviceA.getCharacteristic(Characteristic.VOCDensity)
-      .on('get', this.getVOCValue.bind(this))
+      this.serviceA.getCharacteristic(Characteristic.VOCDensity)
+        .on('get', this.getVOCValue.bind(this))
 
-    this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity)
-      .setProps({
-        minValue: 0,
-        maxValue: 4000
-      });
+      this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity)
+        .setProps({
+          minValue: 0,
+          maxValue: 4000
+        });
+    }
 
     // this.serviceA.getCharacteristic(Characteristic.VOCdensity)
     //   .setProps({
@@ -782,10 +789,12 @@ AirQuality.prototype = {
         this.serviceA.getCharacteristic(Characteristic.AirQuality).updateValue(temp);
       }.bind(this));
 
-      this.getAirQualityValue(function(err, temp) {
-        if (err) { this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(new Error('no response')); return; }
-        this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(temp);
-      }.bind(this));
+      if (!this.vocIndex) {
+        this.getAirQualityValue(function(err, temp) {
+          if (err) { this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(new Error('no response')); return; }
+          this.serviceA.getCharacteristic(Characteristic.AirParticulateDensity).updateValue(temp);
+        }.bind(this));
+      }
 
       // this.getAirQualityValue(function(err, temp) {
       //   if (err) {temp = err;}
