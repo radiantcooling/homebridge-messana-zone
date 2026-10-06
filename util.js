@@ -96,6 +96,9 @@ const SNAPSHOT_TIMEOUT_MS = 4000;
 // below the 3 s after which Homebridge reports the plugin as slow.
 const SNAPSHOT_FIRST_WAIT_MS = 2500;
 const SNAPSHOT_RETRY_UNSUPPORTED_MS = 10 * 60 * 1000;
+// A snapshot that fails before any has ever worked (a busy backend that answers
+// late, one still starting): one GET per value for a while, then try again.
+const SNAPSHOT_RETRY_FAILED_MS = 60 * 1000;
 const SNAPSHOT_FORGET_PATH_MS = 15 * 60 * 1000;
 const SNAPSHOT_GLOBAL = Symbol.for('messana.homebridge.snapshot.v1');
 
@@ -108,7 +111,13 @@ function createSnapshotCache() {
   var polling = false;
   var pollAgain = false;
   var timer = null;
-  var unsupportedUntil = 0;
+  var everWorked = false;
+  // One GET per value, as before the cache: the backend has no snapshot route, or
+  // no snapshot has worked yet. While it lasts no read waits for a snapshot; one
+  // is tried again in the background at `nextProbeAt`.
+  var fallback = false;
+  var nextProbeAt = 0;
+  var warned = false;
 
   function answerWaiting(path, entry) {
     var list = waiting[path];
@@ -119,7 +128,7 @@ function createSnapshotCache() {
 
   function poll() {
     if (polling) { pollAgain = true; return; }
-    if (!base || Date.now() < unsupportedUntil) return;
+    if (!base || (fallback && Date.now() < nextProbeAt)) return;
 
     var now = Date.now();
     Object.keys(wanted).forEach(function(path) {
@@ -138,32 +147,44 @@ function createSnapshotCache() {
     }, function(error, response, body) {
       polling = false;
 
-      if (!error && response && response.statusCode == 404) {
-        // Backend older than the snapshot route.
-        unsupportedUntil = Date.now() + SNAPSHOT_RETRY_UNSUPPORTED_MS;
-        entries = {};
-        console.log('[Messana] The backend has no ' + SNAPSHOT_ROUTE + ' route: reading one value per request.');
-      }
-
       var values = (!error && response && response.statusCode < 400 && body && body.value) || null;
+      var missing = !error && response && response.statusCode == 404;
+
       if (values) {
         var at = Date.now();
         Object.keys(values).forEach(function(path) {
           entries[path] = { statusCode: values[path].status, body: JSON.stringify(values[path].body), at: at };
         });
+        if (warned) console.log('[Messana] The backend now has the ' + SNAPSHOT_ROUTE + ' route: reading from the snapshot.');
+        everWorked = true;
+        fallback = false;
+        warned = false;
+      } else if (missing || !everWorked) {
+        // 404 is a backend older than the route. Anything else before the first
+        // good snapshot (a busy backend, one still starting) is tried again sooner.
+        if (missing && !warned) {
+          console.log('[Messana] The backend has no ' + SNAPSHOT_ROUTE + ' route: reading one value per request.');
+          warned = true;
+        }
+        everWorked = false;
+        fallback = true;
+        nextProbeAt = Date.now() + (missing ? SNAPSHOT_RETRY_UNSUPPORTED_MS : SNAPSHOT_RETRY_FAILED_MS);
+        entries = {};
       }
+      // A backend that has the route and misses one snapshot (a restart) keeps
+      // being asked: meanwhile the reads are answered with the last values.
 
       // Whoever is still waiting gets its value, or goes to the backend directly.
       Object.keys(waiting).forEach(function(path) { answerWaiting(path, (values && values[path] && entries[path]) || null); });
 
-      if (pollAgain) poll();
+      if (pollAgain && !fallback) poll();
     });
   }
 
   function get(url, callback) {
     var q = url.indexOf('?');
     var route = staticValues.apiroute;
-    if (q < 0 || url.indexOf(route) !== 0 || Date.now() < unsupportedUntil) return false;
+    if (q < 0 || url.indexOf(route) !== 0) return false;
 
     var path = url.slice(route.length, q).replace(/\/$/, '');
     base = route;
@@ -174,6 +195,8 @@ function createSnapshotCache() {
       timer = setInterval(poll, SNAPSHOT_INTERVAL_MS);
       if (timer.unref) timer.unref();
     }
+
+    if (fallback) return false;
 
     var entry = entries[path];
     if (entry && Date.now() - entry.at <= LAST_GOOD_MAX_AGE_MS) {
