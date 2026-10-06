@@ -91,7 +91,10 @@ function httpGet(url, body, callback) {
 // ---------------------------------------------------------------------------
 const SNAPSHOT_ROUTE = 'homebridge/snapshot';
 const SNAPSHOT_INTERVAL_MS = 5000;
-const SNAPSHOT_TIMEOUT_MS = 4000;
+// Long on purpose: no read waits for this request (a read waits SNAPSHOT_FIRST_WAIT_MS at
+// most), and a backend already saturated by one GET per value answers it in 4-5 s. With a
+// short timeout the snapshot never got through and the plugins stayed on one GET per value.
+const SNAPSHOT_TIMEOUT_MS = 15000;
 // A read that finds nothing in memory waits for the next snapshot, but stays
 // below the 3 s after which Homebridge reports the plugin as slow.
 const SNAPSHOT_FIRST_WAIT_MS = 2500;
@@ -246,6 +249,21 @@ exports.httpRequest = (url, body, method, callback) => {
     });
   } else if (!snapshot.get(url, callback)) {
     httpGet(url, body, callback);
+  }
+}
+
+// HomeKit refuses, with a warning in the log at every refresh, a value outside the range the
+// characteristic declares. A setpoint the system accepts must not be refused by the plugin:
+// if it falls outside the declared range, the range is widened to hold it.
+exports.fitRange = (characteristic, value) => {
+  value = Number(value);
+  if (!isFinite(value)) return;
+  var props = characteristic.props;
+  if (value < props.minValue || value > props.maxValue) {
+    characteristic.setProps({
+      minValue: Math.min(props.minValue, Math.floor(value)),
+      maxValue: Math.max(props.maxValue, Math.ceil(value))
+    });
   }
 }
 
