@@ -11,6 +11,7 @@
       "getCurrentTemperature": "zone/temperature/",
       "getTargetTemperature": "zone/setpoint/",
       "setTargetTemperature": "zone/setpoint",
+      "getSetpointLimits": "zone/limits/",
       "getHumidity": "zone/humidity/",
       "getTargetHumidity": "zone/currentSetpointRH/",
       "setTargetHumidity": "zone/currentSetpointRH",
