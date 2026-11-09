@@ -1,6 +1,66 @@
 'use strict'
 
-var request = require("request");
+var http = require("http");
+var https = require("https");
+
+// HTTP calls to the backend with the core http module (task #316). The plugins used
+// to call `request`, which they never declared: on the mBox it came from the global
+// node_modules, an old copy (2.65.0) that calls util._extend, and under Node 24 that
+// prints "[DEP0060] DeprecationWarning" at every Homebridge start. `request` itself
+// is deprecated and prints DEP0040 (punycode) too. This function takes the options
+// the plugins gave `request` (url/uri, method, body, json, timeout) and answers the
+// same way: callback(error, { statusCode }, body), with body parsed when `json` is set.
+function nativeRequest(options, callback) {
+  var finished = false;
+  function finish(error, response, body) {
+    if (finished) return;
+    finished = true;
+    callback(error, response, body);
+  }
+
+  var url;
+  try { url = new URL(options.url || options.uri); } catch (e) { return setImmediate(function() { finish(e); }); }
+
+  var payload = null;
+  var headers = {};
+  if (options.json !== undefined) {
+    payload = JSON.stringify(options.json);
+    headers['content-type'] = 'application/json';
+    headers['accept'] = 'application/json';
+  } else if (options.body) {
+    payload = String(options.body);
+  }
+  if (payload !== null) headers['content-length'] = Buffer.byteLength(payload);
+
+  var lib = url.protocol === 'https:' ? https : http;
+  var req = lib.request(url, { method: options.method || 'GET', headers: headers, rejectUnauthorized: false }, function(res) {
+    var chunks = [];
+    res.on('data', function(chunk) { chunks.push(chunk); });
+    res.on('error', finish);
+    res.on('end', function() {
+      var body = Buffer.concat(chunks).toString('utf8');
+      if (options.json !== undefined && body) {
+        try { body = JSON.parse(body); } catch (e) { /* not JSON: keep the text, as request did */ }
+      }
+      finish(null, { statusCode: res.statusCode, headers: res.headers }, body);
+    });
+  });
+  if (options.timeout) {
+    req.setTimeout(options.timeout, function() {
+      var error = new Error('ETIMEDOUT');
+      error.code = 'ETIMEDOUT';
+      req.destroy(error);
+    });
+  }
+  req.on('error', finish);
+  if (payload !== null) req.write(payload);
+  req.end();
+}
+
+// The function every call below goes through; the bench test puts a fake backend here.
+var send = nativeRequest;
+exports._setTransport = function(fn) { send = fn || nativeRequest; };
+
 const staticValues = {
   "name": "Messana Plugins",
   "description": "Messana plugins",
@@ -28,7 +88,7 @@ const inFlight = {};
 const lastGood = {};
 
 function getOnce(url, body, attempt, done) {
-  request({
+  send({
       url: url,
       body: body,
       method: 'GET',
@@ -142,7 +202,7 @@ function createSnapshotCache() {
 
     polling = true;
     pollAgain = false;
-    request({
+    send({
       method: 'POST',
       uri: base + SNAPSHOT_ROUTE + query,
       json: { paths: paths },
@@ -236,7 +296,7 @@ const snapshot = global[SNAPSHOT_GLOBAL] || (global[SNAPSHOT_GLOBAL] = createSna
 exports.httpRequest = (url, body, method, callback) => {
   if (method == 'PUT' || method == 'POST') {
     // No retry: a write that timed out may still have been applied.
-    request({
+    send({
       method: "PUT",
       uri: url,
       json: body,
